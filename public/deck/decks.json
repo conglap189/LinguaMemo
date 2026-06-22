@@ -1,20 +1,23 @@
 [
   {
-    "id": "english",
-    "name": "English Vocabulary",
+    "id": "starter-english-basic-1000",
+    "name": "English Basic Words",
     "language": "English",
-    "file": "/deck/english.apkg"
+    "description": "A starter English vocabulary deck.",
+    "url": "https://tuvung.teknylab.com/deck/english.apkg"
   },
   {
-    "id": "portuguese",
-    "name": "Portuguese Vocabulary",
+    "id": "starter-portuguese-a1-a2",
+    "name": "Portuguese A1/A2 Essential Words",
     "language": "Portuguese",
-    "file": "/deck/portuguese.apkg"
+    "description": "A starter Portuguese vocabulary deck.",
+    "url": "https://tuvung.teknylab.com/deck/portuguese.apkg"
   },
   {
-    "id": "spanish",
-    "name": "Spanish Vocabulary",
+    "id": "starter-spanish-core-1k",
+    "name": "Spanish Core 1K",
     "language": "Spanish",
-    "file": "/deck/spanish.apkg"
+    "description": "A starter Spanish vocabulary deck.",
+    "url": "https://tuvung.teknylab.com/deck/spanish.apkg"
   }
 ]
