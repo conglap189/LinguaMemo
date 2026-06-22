@@ -21,17 +21,20 @@ export function AudioButton({ deckId, filename, index = 1, total = 1, variant = 
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const playTimeoutRef = useRef<number | null>(null)
 
+  function clearPlayTimeout() {
+    if (playTimeoutRef.current !== null) {
+      window.clearTimeout(playTimeoutRef.current)
+      playTimeoutRef.current = null
+    }
+  }
+
   useEffect(() => {
     let cancelled = false
-
-    function clearPlayTimeout() {
-      if (playTimeoutRef.current !== null) {
-        window.clearTimeout(playTimeoutRef.current)
-        playTimeoutRef.current = null
-      }
-    }
+    const audio = audioRef.current
 
     cleanupRef.current()
+    if (!audio) return
+    const audioElement = audio
     setStatus('loading')
 
     async function prepareAudio() {
@@ -51,36 +54,23 @@ export function AudioButton({ deckId, filename, index = 1, total = 1, variant = 
 
         const blob = media.blob.type === audioMimeType ? media.blob : new Blob([media.blob], { type: audioMimeType })
         const url = URL.createObjectURL(blob)
-        const audio = new Audio()
 
-        audio.preload = 'auto'
-        audio.src = url
-        audio.setAttribute('playsinline', 'true')
-        audio.setAttribute('webkit-playsinline', 'true')
+        audioElement.preload = 'auto'
+        audioElement.src = url
+        audioElement.setAttribute('playsinline', 'true')
+        audioElement.setAttribute('webkit-playsinline', 'true')
 
         const cleanup = () => {
           clearPlayTimeout()
-          audio.pause()
-          audio.removeAttribute('src')
-          audio.load()
+          audioElement.pause()
+          audioElement.removeAttribute('src')
+          audioElement.load()
           URL.revokeObjectURL(url)
-          if (audioRef.current === audio) audioRef.current = null
           cleanupRef.current = () => {}
         }
 
-        audio.addEventListener('ended', () => {
-          clearPlayTimeout()
-          audio.currentTime = 0
-          setStatus('idle')
-        })
-        audio.addEventListener('error', () => {
-          clearPlayTimeout()
-          setStatus('error')
-        })
-
-        audioRef.current = audio
         cleanupRef.current = cleanup
-        audio.load()
+        audioElement.load()
         setStatus('idle')
       } catch (error) {
         if (cancelled) return
@@ -96,6 +86,17 @@ export function AudioButton({ deckId, filename, index = 1, total = 1, variant = 
       cleanupRef.current()
     }
   }, [deckId, filename])
+
+  function handleAudioEnded() {
+    clearPlayTimeout()
+    if (audioRef.current) audioRef.current.currentTime = 0
+    setStatus('idle')
+  }
+
+  function handleAudioError() {
+    clearPlayTimeout()
+    setStatus('error')
+  }
 
   async function playAudio(event: MouseEvent<HTMLButtonElement>) {
     event.stopPropagation()
@@ -145,6 +146,7 @@ export function AudioButton({ deckId, filename, index = 1, total = 1, variant = 
   if (displayVariant === 'anki') {
     return (
       <span className="anki-audio-button-wrap">
+        <audio ref={audioRef} preload="auto" playsInline className="hidden" onEnded={handleAudioEnded} onError={handleAudioError} />
         <Button
           type="button"
           variant="outline"
@@ -167,6 +169,7 @@ export function AudioButton({ deckId, filename, index = 1, total = 1, variant = 
 
   return (
     <span className={displayVariant === 'inline' ? 'mx-2 inline-flex flex-col items-start gap-1 align-middle' : 'inline-flex flex-col items-start gap-1 align-middle'}>
+      <audio ref={audioRef} preload="auto" playsInline className="hidden" onEnded={handleAudioEnded} onError={handleAudioError} />
       <Button
         type="button"
         size={displayVariant === 'inline' ? 'sm' : 'lg'}
