@@ -119,7 +119,7 @@ export function DashboardPage({ onViewChange, onStudyDeck, initialManageDeckId, 
         )}
       </section>
 
-      {decks !== undefined && deckList.length === 0 && <StarterDeckSection decks={deckList} />}
+      {decks !== undefined && <StarterDeckSection decks={deckList} />}
 
       <NewDeckDialog open={newDeckOpen} onOpenChange={setNewDeckOpen} existingNames={deckList.map((deck) => deck.name)} />
       <DeckManageModal deck={manageDeck} open={manageDeck !== null} onOpenChange={(open) => { if (!open) { setManageDeckId(null); onManageDeckClosed?.() } }} onStudyDeck={onStudyDeck} />
