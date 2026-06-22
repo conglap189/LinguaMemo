@@ -1,17 +1,19 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { ArrowRight, MoreHorizontal, Plus, Upload } from 'lucide-react'
+import { ArrowRight, MoreHorizontal, Plus, Trash2, Upload } from 'lucide-react'
 
 import type { AppView } from '@/components/app/types'
 import { DeckManageModal } from '@/components/dashboard/DeckManageModal'
 import { DeckCountPills } from '@/components/decks/deck-counts'
 import { StarterDeckSection } from '@/components/starter-decks/StarterDeckSection'
-import { createDeck } from '@/src/db/deckRepo'
+import { createDeck, deleteDeck } from '@/src/db/deckRepo'
+import { LAST_DECK_ID_STORAGE_KEY } from '@/src/features/study/resolveStudyDeckId'
 import { useDecks } from '@/src/hooks/useDecks'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import {
   Dialog,
   DialogContent,
@@ -20,6 +22,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
@@ -37,7 +46,21 @@ export function DashboardPage({ onViewChange, onStudyDeck, initialManageDeckId, 
   const deckList = decks ?? []
   const [newDeckOpen, setNewDeckOpen] = useState(false)
   const [manageDeckId, setManageDeckId] = useState<string | null>(initialManageDeckId ?? null)
+  const [pendingDeleteDeckId, setPendingDeleteDeckId] = useState<string | null>(null)
   const manageDeck = deckList.find((deck) => deck.id === manageDeckId) ?? null
+  const pendingDeleteDeck = deckList.find((deck) => deck.id === pendingDeleteDeckId) ?? null
+
+  async function handleDeleteDeck() {
+    if (!pendingDeleteDeck) return
+
+    const deckId = pendingDeleteDeck.id
+    await deleteDeck(deckId)
+    if (manageDeckId === deckId) setManageDeckId(null)
+    if (localStorage.getItem(LAST_DECK_ID_STORAGE_KEY) === deckId) {
+      localStorage.removeItem(LAST_DECK_ID_STORAGE_KEY)
+    }
+    setPendingDeleteDeckId(null)
+  }
 
   return (
     <div className="mx-auto h-full max-w-6xl overflow-y-auto overflow-x-hidden bg-cream pb-[calc(88px+env(safe-area-inset-bottom))] lg:pb-0">
@@ -91,7 +114,27 @@ export function DashboardPage({ onViewChange, onStudyDeck, initialManageDeckId, 
                     <h3 className="truncate text-xl font-extrabold tracking-tight text-forest">{deck.name}</h3>
                     <p className="mt-1 text-sm text-muted-foreground">{deck.source === 'apkg' ? 'Imported from .apkg' : deck.language ?? 'Manual deck'}</p>
                   </div>
-                  <Badge variant="outline" className="shrink-0 rounded-xl border-forest/20 text-forest">{deck.source}</Badge>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Badge variant="outline" className="rounded-xl border-forest/20 text-forest">{deck.source}</Badge>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button type="button" variant="outline" size="icon" className="h-9 w-9 rounded-full bg-white" aria-label={`Deck actions for ${deck.name}`}>
+                          <MoreHorizontal className="size-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-44 rounded-2xl bg-white p-1.5">
+                        <DropdownMenuItem className="rounded-xl" onClick={() => setManageDeckId(deck.id)}>
+                          <MoreHorizontal className="size-4" />
+                          Manage
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem variant="destructive" className="rounded-xl" onClick={() => setPendingDeleteDeckId(deck.id)}>
+                          <Trash2 className="size-4" />
+                          Delete deck
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </div>
 
                 <DeckCountPills total={deck.cardCount} newCount={deck.newAvailableCount ?? deck.newCount} learningCount={deck.learningCount ?? 0} dueCount={deck.dueCount} />
@@ -110,7 +153,6 @@ export function DashboardPage({ onViewChange, onStudyDeck, initialManageDeckId, 
 
                 <div className="mt-auto flex gap-2 md:gap-3">
                   <Button type="button" onClick={() => onStudyDeck?.(deck.id)} className="flex-1 rounded-2xl bg-forest hover:bg-forest-dark">Study <ArrowRight className="size-4" /></Button>
-                  <Button type="button" variant="outline" onClick={() => setManageDeckId(deck.id)} className="rounded-2xl bg-white px-4"><MoreHorizontal className="size-4" /><span className="sr-only md:not-sr-only">Manage</span></Button>
                 </div>
               </CardContent>
             </Card>
@@ -123,6 +165,15 @@ export function DashboardPage({ onViewChange, onStudyDeck, initialManageDeckId, 
 
       <NewDeckDialog open={newDeckOpen} onOpenChange={setNewDeckOpen} existingNames={deckList.map((deck) => deck.name)} />
       <DeckManageModal deck={manageDeck} open={manageDeck !== null} onOpenChange={(open) => { if (!open) { setManageDeckId(null); onManageDeckClosed?.() } }} onStudyDeck={onStudyDeck} />
+      <ConfirmModal
+        open={pendingDeleteDeck !== null}
+        title="Delete deck?"
+        description={pendingDeleteDeck ? `Delete “${pendingDeleteDeck.name}” and all of its cards, media, and review history from this browser. If this was a starter deck, it will become available to import again.` : ''}
+        confirmLabel="Delete deck"
+        destructive
+        onCancel={() => setPendingDeleteDeckId(null)}
+        onConfirm={handleDeleteDeck}
+      />
     </div>
   )
 }
