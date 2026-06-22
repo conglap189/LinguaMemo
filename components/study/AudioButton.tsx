@@ -44,11 +44,12 @@ export function AudioButton({ deckId, filename, index = 1, total = 1, variant = 
           return
         }
 
-        if (!media.mimeType.startsWith('audio/')) {
+        const audioMimeType = getPlayableAudioMimeType(filename, media.mimeType)
+        if (!audioMimeType.startsWith('audio/')) {
           console.warn(`Media file is not marked as audio: ${filename} (${media.mimeType})`)
         }
 
-        const blob = media.blob.type ? media.blob : new Blob([media.blob], { type: media.mimeType || 'audio/mpeg' })
+        const blob = media.blob.type === audioMimeType ? media.blob : new Blob([media.blob], { type: audioMimeType })
         const url = URL.createObjectURL(blob)
         const audio = new Audio()
 
@@ -185,4 +186,29 @@ export function AudioButton({ deckId, filename, index = 1, total = 1, variant = 
       {status === 'error' && <span className="text-xs font-semibold text-red-600">Audio could not play</span>}
     </span>
   )
+}
+
+function getPlayableAudioMimeType(filename: string, storedMimeType: string) {
+  const extension = filename.split('?')[0]?.split('#')[0]?.toLowerCase().split('.').pop()
+
+  switch (extension) {
+    case 'mp3':
+      return 'audio/mpeg'
+    case 'm4a':
+    case 'mp4':
+      return 'audio/mp4'
+    case 'aac':
+      return 'audio/aac'
+    case 'wav':
+      return 'audio/wav'
+    case 'ogg':
+      return 'audio/ogg'
+    case '3gp':
+    case '3gpp':
+      return 'audio/3gpp'
+    case '3g2':
+      return 'audio/3gpp2'
+    default:
+      return storedMimeType.startsWith('audio/') ? storedMimeType : 'audio/mpeg'
+  }
 }

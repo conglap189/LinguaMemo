@@ -56,6 +56,11 @@ export function detectMimeType(filename: string) {
       return 'audio/mp4'
     case 'aac':
       return 'audio/aac'
+    case '3gp':
+    case '3gpp':
+      return 'audio/3gpp'
+    case '3g2':
+      return 'audio/3gpp2'
     case 'jpg':
     case 'jpeg':
       return 'image/jpeg'
