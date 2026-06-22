@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Plus_Jakarta_Sans } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
@@ -10,8 +10,22 @@ const plusJakarta = Plus_Jakarta_Sans({
 })
 
 export const metadata: Metadata = {
-  title: 'LinguaMemo — Local-first language flashcards',
-  description: 'Import Anki decks and study languages directly in your browser.',
+  title: 'LinguaMemo',
+  description: 'Local-first language flashcards',
+  applicationName: 'LinguaMemo',
+  manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    title: 'LinguaMemo',
+    statusBarStyle: 'default',
+  },
+  icons: {
+    apple: '/icons/apple-touch-icon.png',
+  },
+}
+
+export const viewport: Viewport = {
+  themeColor: '#063F16',
 }
 
 export default function RootLayout({
