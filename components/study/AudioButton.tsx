@@ -18,57 +18,114 @@ type AudioButtonProps = {
 export function AudioButton({ deckId, filename, index = 1, total = 1, variant = 'inline' }: AudioButtonProps) {
   const [status, setStatus] = useState<'idle' | 'loading' | 'playing' | 'missing' | 'error'>('idle')
   const cleanupRef = useRef<() => void>(() => {})
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const playTimeoutRef = useRef<number | null>(null)
 
-  useEffect(() => () => cleanupRef.current(), [])
+  useEffect(() => {
+    let cancelled = false
+
+    function clearPlayTimeout() {
+      if (playTimeoutRef.current !== null) {
+        window.clearTimeout(playTimeoutRef.current)
+        playTimeoutRef.current = null
+      }
+    }
+
+    cleanupRef.current()
+    setStatus('loading')
+
+    async function prepareAudio() {
+      try {
+        const media = await getMediaByFilename(deckId, filename)
+        if (cancelled) return
+
+        if (!media) {
+          setStatus('missing')
+          return
+        }
+
+        if (!media.mimeType.startsWith('audio/')) {
+          console.warn(`Media file is not marked as audio: ${filename} (${media.mimeType})`)
+        }
+
+        const blob = media.blob.type ? media.blob : new Blob([media.blob], { type: media.mimeType || 'audio/mpeg' })
+        const url = URL.createObjectURL(blob)
+        const audio = new Audio()
+
+        audio.preload = 'auto'
+        audio.src = url
+        audio.setAttribute('playsinline', 'true')
+        audio.setAttribute('webkit-playsinline', 'true')
+
+        const cleanup = () => {
+          clearPlayTimeout()
+          audio.pause()
+          audio.removeAttribute('src')
+          audio.load()
+          URL.revokeObjectURL(url)
+          if (audioRef.current === audio) audioRef.current = null
+          cleanupRef.current = () => {}
+        }
+
+        audio.addEventListener('ended', () => {
+          clearPlayTimeout()
+          audio.currentTime = 0
+          setStatus('idle')
+        })
+        audio.addEventListener('error', () => {
+          clearPlayTimeout()
+          setStatus('error')
+        })
+
+        audioRef.current = audio
+        cleanupRef.current = cleanup
+        audio.load()
+        setStatus('idle')
+      } catch (error) {
+        if (cancelled) return
+        console.warn(`Could not prepare audio: ${filename}`, error)
+        setStatus('error')
+      }
+    }
+
+    void prepareAudio()
+
+    return () => {
+      cancelled = true
+      cleanupRef.current()
+    }
+  }, [deckId, filename])
 
   async function playAudio(event: MouseEvent<HTMLButtonElement>) {
     event.stopPropagation()
     if (status === 'loading' || status === 'playing') return
 
-    setStatus('loading')
-    cleanupRef.current()
-
     try {
-      const media = await getMediaByFilename(deckId, filename)
-      if (!media) {
-        setStatus('missing')
+      const audio = audioRef.current
+      if (!audio) {
+        setStatus(status === 'missing' ? 'missing' : 'error')
         return
       }
 
-      if (!media.mimeType.startsWith('audio/')) {
-        console.warn(`Media file is not marked as audio: ${filename} (${media.mimeType})`)
+      if (playTimeoutRef.current !== null) {
+        window.clearTimeout(playTimeoutRef.current)
+        playTimeoutRef.current = null
       }
 
-      const url = URL.createObjectURL(media.blob)
-      const audio = new Audio(url)
-      const cleanup = () => {
-        window.clearTimeout(timeout)
+      audio.pause()
+      audio.currentTime = 0
+      setStatus('playing')
+
+      playTimeoutRef.current = window.setTimeout(() => {
         audio.pause()
-        URL.revokeObjectURL(url)
-        cleanupRef.current = () => {}
-      }
-
-      const timeout = window.setTimeout(() => {
-        cleanup()
+        audio.currentTime = 0
+        playTimeoutRef.current = null
         setStatus('idle')
       }, 120_000)
 
-      cleanupRef.current = cleanup
-
-      audio.addEventListener('ended', () => {
-        cleanupRef.current()
-        setStatus('idle')
-      }, { once: true })
-      audio.addEventListener('error', () => {
-        cleanupRef.current()
-        setStatus('error')
-      }, { once: true })
-
       await audio.play()
-      setStatus('playing')
     } catch (error) {
       console.warn(`Could not play audio: ${filename}`, error)
-      cleanupRef.current()
       setStatus('error')
     }
   }
