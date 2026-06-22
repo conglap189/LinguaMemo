@@ -1,0 +1,20 @@
+[
+  {
+    "id": "english",
+    "name": "English Vocabulary",
+    "language": "English",
+    "file": "/deck/english.apkg"
+  },
+  {
+    "id": "portuguese",
+    "name": "Portuguese Vocabulary",
+    "language": "Portuguese",
+    "file": "/deck/portuguese.apkg"
+  },
+  {
+    "id": "spanish",
+    "name": "Spanish Vocabulary",
+    "language": "Spanish",
+    "file": "/deck/spanish.apkg"
+  }
+]
