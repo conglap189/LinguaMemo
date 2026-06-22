@@ -205,9 +205,9 @@ function getPlayableAudioMimeType(filename: string, storedMimeType: string) {
       return 'audio/ogg'
     case '3gp':
     case '3gpp':
-      return 'audio/3gpp'
+      return 'audio/mp4'
     case '3g2':
-      return 'audio/3gpp2'
+      return 'audio/mp4'
     default:
       return storedMimeType.startsWith('audio/') ? storedMimeType : 'audio/mpeg'
   }
