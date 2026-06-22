@@ -6,7 +6,9 @@ export type StarterDeckManifestItem = {
   id: string
   name: string
   language: string
-  file: string
+  description?: string
+  url?: string
+  file?: string
 }
 
 export const starterDeckManifestPath = '/deck/decks.json'
@@ -24,9 +26,12 @@ export async function importStarterDeck(deck: StarterDeckManifestItem, options: 
     throw new Error('Already imported')
   }
 
+  const deckUrl = deck.url || deck.file
+  if (!deckUrl) throw new Error(starterDeckLoadError)
+
   let response: Response
   try {
-    response = await fetch(deck.file)
+    response = await fetch(deckUrl)
   } catch {
     throw new Error(starterDeckLoadError)
   }
@@ -34,7 +39,7 @@ export async function importStarterDeck(deck: StarterDeckManifestItem, options: 
   if (!response.ok) throw new Error(starterDeckLoadError)
 
   const blob = await response.blob()
-  const filename = deck.file.split('/').pop() || `${deck.id}.apkg`
+  const filename = deckUrl.split('/').pop() || `${deck.id}.apkg`
   const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' })
 
   return importApkg(file, {
