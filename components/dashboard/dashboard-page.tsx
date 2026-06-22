@@ -109,12 +109,12 @@ export function DashboardPage({ onViewChange, onStudyDeck, initialManageDeckId, 
           {deckList.map((deck) => (
             <Card key={deck.id} className="rounded-3xl border-0 bg-white shadow-sm transition-colors hover:bg-cream-dark/30">
               <CardContent className="flex h-full flex-col gap-5 p-5 md:p-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <h3 className="truncate text-xl font-extrabold tracking-tight text-forest">{deck.name}</h3>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="break-words text-xl font-extrabold tracking-tight text-forest sm:line-clamp-2">{deck.name}</h3>
                     <p className="mt-1 text-sm text-muted-foreground">{deck.source === 'apkg' ? 'Imported from .apkg' : deck.language ?? 'Manual deck'}</p>
                   </div>
-                  <div className="flex shrink-0 items-center gap-2">
+                  <div className="flex shrink-0 items-center justify-between gap-2 sm:justify-end">
                     <Badge variant="outline" className="rounded-xl border-forest/20 text-forest">{deck.source}</Badge>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>

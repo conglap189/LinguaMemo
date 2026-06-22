@@ -19,7 +19,7 @@ const countStyles = {
 
 export function DeckCountPills({ total, newCount, learningCount, dueCount, className }: DeckCountsProps) {
   return (
-    <div className={cn('flex flex-wrap gap-2', className)}>
+    <div className={cn('grid grid-cols-2 gap-2 sm:flex sm:flex-wrap', className)}>
       <CountPill label="Total" value={total} className={countStyles.total} />
       <CountPill label="New" value={newCount} className={countStyles.new} />
       <CountPill label="Learning" value={learningCount} className={countStyles.learning} />
@@ -41,9 +41,9 @@ export function DeckCountTiles({ total, newCount, learningCount, dueCount, class
 
 function CountPill({ label, value, className }: { label: string; value: number; className: string }) {
   return (
-    <span className={cn('inline-flex items-center gap-1.5 rounded-2xl border px-3 py-1.5 text-xs font-extrabold shadow-sm', className)}>
+    <span className={cn('inline-flex min-w-0 items-center justify-between gap-2 rounded-2xl border px-3 py-2 text-xs font-extrabold shadow-sm sm:justify-start sm:py-1.5', className)}>
       <span className="opacity-75">{label}</span>
-      <span>{value.toLocaleString()}</span>
+      <span className="truncate">{value.toLocaleString()}</span>
     </span>
   )
 }
