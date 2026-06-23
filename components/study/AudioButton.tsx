@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, type MouseEvent } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type MouseEvent } from 'react'
 import { Play } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -16,7 +16,7 @@ type AudioButtonProps = {
 }
 
 export function AudioButton({ deckId, filename, index = 1, total = 1, variant = 'inline' }: AudioButtonProps) {
-  const [status, setStatus] = useState<'idle' | 'loading' | 'playing' | 'missing' | 'error'>('idle')
+  const [status, setStatus] = useState<'idle' | 'loading' | 'playing' | 'missing' | 'unsupported' | 'error'>('idle')
   const cleanupRef = useRef<() => void>(() => {})
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const playTimeoutRef = useRef<number | null>(null)
@@ -50,6 +50,12 @@ export function AudioButton({ deckId, filename, index = 1, total = 1, variant = 
         const audioMimeType = getPlayableAudioMimeType(filename, media.mimeType)
         if (!audioMimeType.startsWith('audio/')) {
           console.warn(`Media file is not marked as audio: ${filename} (${media.mimeType})`)
+        }
+
+        if (!canBrowserPlayAudioType(audioElement, audioMimeType)) {
+          console.warn(`Audio format is not supported by this browser: ${filename} (${audioMimeType})`)
+          setStatus('unsupported')
+          return
         }
 
         const blob = media.blob.type === audioMimeType ? media.blob : new Blob([media.blob], { type: audioMimeType })
@@ -116,6 +122,9 @@ export function AudioButton({ deckId, filename, index = 1, total = 1, variant = 
 
       audio.pause()
       audio.currentTime = 0
+      if (audio.networkState === HTMLMediaElement.NETWORK_EMPTY || audio.readyState === HTMLMediaElement.HAVE_NOTHING) {
+        audio.load()
+      }
       setStatus('playing')
 
       playTimeoutRef.current = window.setTimeout(() => {
@@ -133,7 +142,7 @@ export function AudioButton({ deckId, filename, index = 1, total = 1, variant = 
   }
 
   const displayVariant = variant === 'pill' ? 'inline' : variant
-  const disabled = status === 'loading' || status === 'playing' || status === 'missing'
+  const disabled = status === 'loading' || status === 'playing' || status === 'missing' || status === 'unsupported'
   const baseLabel = displayVariant === 'inline' ? 'Play' : total > 1 ? `Play audio ${index}` : 'Play audio'
   const label = status === 'missing'
     ? 'Audio missing'
@@ -141,12 +150,16 @@ export function AudioButton({ deckId, filename, index = 1, total = 1, variant = 
       ? 'Loading audio…'
       : status === 'playing'
         ? 'Playing audio…'
-        : baseLabel
+        : status === 'unsupported'
+          ? 'Audio not supported on this browser'
+          : baseLabel
+
+  const audioElement = <audio ref={audioRef} preload="auto" playsInline style={hiddenPlayableAudioStyle} onEnded={handleAudioEnded} onError={handleAudioError} />
 
   if (displayVariant === 'anki') {
     return (
       <span className="anki-audio-button-wrap">
-        <audio ref={audioRef} preload="auto" playsInline className="hidden" onEnded={handleAudioEnded} onError={handleAudioError} />
+        {audioElement}
         <Button
           type="button"
           variant="outline"
@@ -162,6 +175,7 @@ export function AudioButton({ deckId, filename, index = 1, total = 1, variant = 
         >
           <Play className="size-5 fill-current" aria-hidden="true" />
         </Button>
+        {status === 'unsupported' && <span className="text-xs font-semibold text-red-600">Audio format is not supported in this browser</span>}
         {status === 'error' && <span className="text-xs font-semibold text-red-600">Audio could not play</span>}
       </span>
     )
@@ -169,7 +183,7 @@ export function AudioButton({ deckId, filename, index = 1, total = 1, variant = 
 
   return (
     <span className={displayVariant === 'inline' ? 'mx-2 inline-flex flex-col items-start gap-1 align-middle' : 'inline-flex flex-col items-start gap-1 align-middle'}>
-      <audio ref={audioRef} preload="auto" playsInline className="hidden" onEnded={handleAudioEnded} onError={handleAudioError} />
+      {audioElement}
       <Button
         type="button"
         size={displayVariant === 'inline' ? 'sm' : 'lg'}
@@ -186,9 +200,24 @@ export function AudioButton({ deckId, filename, index = 1, total = 1, variant = 
       >
         <span className={displayVariant === 'inline' ? 'mr-1 text-sm' : 'mr-2 text-base'} aria-hidden="true">🔊</span> {label}
       </Button>
+      {status === 'unsupported' && <span className="text-xs font-semibold text-red-600">Audio format is not supported in this browser</span>}
       {status === 'error' && <span className="text-xs font-semibold text-red-600">Audio could not play</span>}
     </span>
   )
+}
+
+const hiddenPlayableAudioStyle: CSSProperties = {
+  position: 'absolute',
+  width: 1,
+  height: 1,
+  opacity: 0,
+  pointerEvents: 'none',
+}
+
+function canBrowserPlayAudioType(audioElement: HTMLAudioElement, mimeType: string) {
+  if (!mimeType.startsWith('audio/')) return true
+  if (typeof audioElement.canPlayType !== 'function') return true
+  return audioElement.canPlayType(mimeType) !== ''
 }
 
 function getPlayableAudioMimeType(filename: string, storedMimeType: string) {
