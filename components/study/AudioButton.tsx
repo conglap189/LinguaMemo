@@ -19,6 +19,8 @@ export function AudioButton({ deckId, filename, index = 1, total = 1, variant = 
   const [status, setStatus] = useState<'idle' | 'loading' | 'playing' | 'missing' | 'unsupported' | 'error'>('idle')
   const cleanupRef = useRef<() => void>(() => {})
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const audioBlobRef = useRef<Blob | null>(null)
+  const objectUrlRef = useRef<string | null>(null)
   const playTimeoutRef = useRef<number | null>(null)
 
   function clearPlayTimeout() {
@@ -28,11 +30,18 @@ export function AudioButton({ deckId, filename, index = 1, total = 1, variant = 
     }
   }
 
+  function revokeCurrentObjectUrl() {
+    if (!objectUrlRef.current) return
+    URL.revokeObjectURL(objectUrlRef.current)
+    objectUrlRef.current = null
+  }
+
   useEffect(() => {
     let cancelled = false
     const audio = audioRef.current
 
     cleanupRef.current()
+    audioBlobRef.current = null
     if (!audio) return
     const audioElement = audio
     setStatus('loading')
@@ -59,10 +68,10 @@ export function AudioButton({ deckId, filename, index = 1, total = 1, variant = 
         }
 
         const blob = media.blob.type === audioMimeType ? media.blob : new Blob([media.blob], { type: audioMimeType })
-        const url = URL.createObjectURL(blob)
+        audioBlobRef.current = blob
 
         audioElement.preload = 'auto'
-        audioElement.src = url
+        audioElement.removeAttribute('src')
         audioElement.setAttribute('playsinline', 'true')
         audioElement.setAttribute('webkit-playsinline', 'true')
 
@@ -71,12 +80,12 @@ export function AudioButton({ deckId, filename, index = 1, total = 1, variant = 
           audioElement.pause()
           audioElement.removeAttribute('src')
           audioElement.load()
-          URL.revokeObjectURL(url)
+          revokeCurrentObjectUrl()
+          audioBlobRef.current = null
           cleanupRef.current = () => {}
         }
 
         cleanupRef.current = cleanup
-        audioElement.load()
         setStatus('idle')
       } catch (error) {
         if (cancelled) return
@@ -95,12 +104,18 @@ export function AudioButton({ deckId, filename, index = 1, total = 1, variant = 
 
   function handleAudioEnded() {
     clearPlayTimeout()
-    if (audioRef.current) audioRef.current.currentTime = 0
+    if (audioRef.current) {
+      audioRef.current.currentTime = 0
+      audioRef.current.removeAttribute('src')
+      audioRef.current.load()
+    }
+    revokeCurrentObjectUrl()
     setStatus('idle')
   }
 
   function handleAudioError() {
     clearPlayTimeout()
+    revokeCurrentObjectUrl()
     setStatus('error')
   }
 
@@ -115,6 +130,12 @@ export function AudioButton({ deckId, filename, index = 1, total = 1, variant = 
         return
       }
 
+      const blob = audioBlobRef.current
+      if (!blob) {
+        setStatus(status === 'missing' ? 'missing' : 'error')
+        return
+      }
+
       if (playTimeoutRef.current !== null) {
         window.clearTimeout(playTimeoutRef.current)
         playTimeoutRef.current = null
@@ -122,14 +143,19 @@ export function AudioButton({ deckId, filename, index = 1, total = 1, variant = 
 
       audio.pause()
       audio.currentTime = 0
-      if (audio.networkState === HTMLMediaElement.NETWORK_EMPTY || audio.readyState === HTMLMediaElement.HAVE_NOTHING) {
-        audio.load()
-      }
+      revokeCurrentObjectUrl()
+      const url = URL.createObjectURL(blob)
+      objectUrlRef.current = url
+      audio.src = url
+      audio.load()
       setStatus('playing')
 
       playTimeoutRef.current = window.setTimeout(() => {
         audio.pause()
         audio.currentTime = 0
+        audio.removeAttribute('src')
+        audio.load()
+        revokeCurrentObjectUrl()
         playTimeoutRef.current = null
         setStatus('idle')
       }, 120_000)
@@ -137,6 +163,7 @@ export function AudioButton({ deckId, filename, index = 1, total = 1, variant = 
       await audio.play()
     } catch (error) {
       console.warn(`Could not play audio: ${filename}`, error)
+      revokeCurrentObjectUrl()
       setStatus('error')
     }
   }
