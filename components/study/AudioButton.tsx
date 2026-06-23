@@ -22,6 +22,7 @@ export function AudioButton({ deckId, filename, index = 1, total = 1, variant = 
   const audioBlobRef = useRef<Blob | null>(null)
   const objectUrlRef = useRef<string | null>(null)
   const playTimeoutRef = useRef<number | null>(null)
+  const suppressNextAudioErrorRef = useRef(false)
 
   function clearPlayTimeout() {
     if (playTimeoutRef.current !== null) {
@@ -34,6 +35,23 @@ export function AudioButton({ deckId, filename, index = 1, total = 1, variant = 
     if (!objectUrlRef.current) return
     URL.revokeObjectURL(objectUrlRef.current)
     objectUrlRef.current = null
+  }
+
+  function resetAudioElement(audioElement: HTMLAudioElement) {
+    suppressNextAudioErrorRef.current = true
+    audioElement.removeAttribute('src')
+    audioElement.load()
+    window.setTimeout(() => {
+      suppressNextAudioErrorRef.current = false
+    }, 0)
+  }
+
+  function stopAndReleaseAudio(audioElement: HTMLAudioElement) {
+    clearPlayTimeout()
+    audioElement.pause()
+    audioElement.currentTime = 0
+    resetAudioElement(audioElement)
+    revokeCurrentObjectUrl()
   }
 
   useEffect(() => {
@@ -76,11 +94,7 @@ export function AudioButton({ deckId, filename, index = 1, total = 1, variant = 
         audioElement.setAttribute('webkit-playsinline', 'true')
 
         const cleanup = () => {
-          clearPlayTimeout()
-          audioElement.pause()
-          audioElement.removeAttribute('src')
-          audioElement.load()
-          revokeCurrentObjectUrl()
+          stopAndReleaseAudio(audioElement)
           audioBlobRef.current = null
           cleanupRef.current = () => {}
         }
@@ -103,17 +117,21 @@ export function AudioButton({ deckId, filename, index = 1, total = 1, variant = 
   }, [deckId, filename])
 
   function handleAudioEnded() {
-    clearPlayTimeout()
     if (audioRef.current) {
-      audioRef.current.currentTime = 0
-      audioRef.current.removeAttribute('src')
-      audioRef.current.load()
+      stopAndReleaseAudio(audioRef.current)
+    } else {
+      clearPlayTimeout()
+      revokeCurrentObjectUrl()
     }
-    revokeCurrentObjectUrl()
     setStatus('idle')
   }
 
   function handleAudioError() {
+    if (suppressNextAudioErrorRef.current || !objectUrlRef.current) {
+      suppressNextAudioErrorRef.current = false
+      return
+    }
+
     clearPlayTimeout()
     revokeCurrentObjectUrl()
     setStatus('error')
@@ -151,11 +169,7 @@ export function AudioButton({ deckId, filename, index = 1, total = 1, variant = 
       setStatus('playing')
 
       playTimeoutRef.current = window.setTimeout(() => {
-        audio.pause()
-        audio.currentTime = 0
-        audio.removeAttribute('src')
-        audio.load()
-        revokeCurrentObjectUrl()
+        stopAndReleaseAudio(audio)
         playTimeoutRef.current = null
         setStatus('idle')
       }, 120_000)
