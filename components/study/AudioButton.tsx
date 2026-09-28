@@ -17,13 +17,13 @@ type AudioButtonProps = {
 
 export function AudioButton({ deckId, filename, index = 1, total = 1, variant = 'inline' }: AudioButtonProps) {
   const [status, setStatus] = useState<'idle' | 'loading' | 'playing' | 'missing' | 'unsupported' | 'error'>('idle')
-  const cleanupRef = useRef<() => void>(() => {})
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const audioBlobRef = useRef<Blob | null>(null)
   const objectUrlRef = useRef<string | null>(null)
   const playTimeoutRef = useRef<number | null>(null)
-  const playbackActiveRef = useRef(false)
-  const suppressNextAudioErrorRef = useRef(false)
+  const generationRef = useRef(0)
+  const mountedRef = useRef(false)
+  const attemptRef = useRef<{ generation: number; url: string; active: boolean } | null>(null)
 
   function clearPlayTimeout() {
     if (playTimeoutRef.current !== null) {
@@ -32,38 +32,63 @@ export function AudioButton({ deckId, filename, index = 1, total = 1, variant = 
     }
   }
 
-  function revokeCurrentObjectUrl() {
-    if (!objectUrlRef.current) return
-    URL.revokeObjectURL(objectUrlRef.current)
+  function revokeObjectUrl(url: string | null) {
+    if (!url || objectUrlRef.current !== url) return
+    URL.revokeObjectURL(url)
     objectUrlRef.current = null
   }
 
-  function resetAudioElement(audioElement: HTMLAudioElement) {
-    playbackActiveRef.current = false
-    suppressNextAudioErrorRef.current = true
-    audioElement.removeAttribute('src')
-    audioElement.load()
-    window.setTimeout(() => {
-      suppressNextAudioErrorRef.current = false
-    }, 1_500)
+  function logAudioDiagnostic(phase: string, error: unknown, audioElement: HTMLAudioElement | null, mimeType?: string) {
+    const mediaError = audioElement?.error
+    console.warn(`[audio:${phase}]`, {
+      filename,
+      mimeType,
+      errorName: error instanceof Error ? error.name : undefined,
+      errorMessage: error instanceof Error ? error.message : String(error),
+      mediaErrorCode: mediaError?.code,
+      mediaErrorMessage: mediaError?.message,
+      readyState: audioElement?.readyState,
+      networkState: audioElement?.networkState,
+    })
   }
 
-  function stopAndReleaseAudio(audioElement: HTMLAudioElement) {
+  function releaseAudio(audioElement = audioRef.current) {
+    generationRef.current += 1
+    if (attemptRef.current) attemptRef.current.active = false
+    attemptRef.current = null
+    clearPlayTimeout()
+    if (audioElement) {
+      audioElement.pause()
+      audioElement.currentTime = 0
+      audioElement.removeAttribute('src')
+      audioElement.load()
+    }
+    revokeObjectUrl(objectUrlRef.current)
+    audioBlobRef.current = null
+  }
+
+  function releaseAttempt(attempt: { generation: number; url: string; active: boolean }) {
+    if (attemptRef.current !== attempt || attempt.generation !== generationRef.current) return
+    attempt.active = false
+    attemptRef.current = null
+    clearPlayTimeout()
+    revokeObjectUrl(attempt.url)
+  }
+
+  function stopPlayback(audioElement: HTMLAudioElement) {
     clearPlayTimeout()
     audioElement.pause()
     audioElement.currentTime = 0
-    resetAudioElement(audioElement)
-    revokeCurrentObjectUrl()
   }
 
   useEffect(() => {
     let cancelled = false
     const audio = audioRef.current
 
-    cleanupRef.current()
-    audioBlobRef.current = null
+    releaseAudio()
     if (!audio) return
     const audioElement = audio
+    mountedRef.current = true
     setStatus('loading')
 
     async function prepareAudio() {
@@ -95,17 +120,10 @@ export function AudioButton({ deckId, filename, index = 1, total = 1, variant = 
         audioElement.setAttribute('playsinline', 'true')
         audioElement.setAttribute('webkit-playsinline', 'true')
 
-        const cleanup = () => {
-          stopAndReleaseAudio(audioElement)
-          audioBlobRef.current = null
-          cleanupRef.current = () => {}
-        }
-
-        cleanupRef.current = cleanup
         setStatus('idle')
       } catch (error) {
         if (cancelled) return
-        console.warn(`Could not prepare audio: ${filename}`, error)
+        logAudioDiagnostic('prepare', error, audioElement)
         setStatus('error')
       }
     }
@@ -114,36 +132,35 @@ export function AudioButton({ deckId, filename, index = 1, total = 1, variant = 
 
     return () => {
       cancelled = true
-      cleanupRef.current()
+      mountedRef.current = false
+      releaseAudio(audioElement)
     }
   }, [deckId, filename])
 
   function handleAudioEnded() {
-    if (audioRef.current) {
-      stopAndReleaseAudio(audioRef.current)
-    } else {
-      clearPlayTimeout()
-      revokeCurrentObjectUrl()
-    }
-    setStatus('idle')
+    const audio = audioRef.current
+    const attempt = attemptRef.current
+    if (!audio || !audio.ended || !attempt || !attempt.active || audio.currentSrc !== attempt.url) return
+    attempt.active = false
+    attemptRef.current = null
+    stopPlayback(audio)
+    if (mountedRef.current) setStatus('idle')
   }
 
   function handleAudioError() {
-    if (suppressNextAudioErrorRef.current || !playbackActiveRef.current || !objectUrlRef.current) {
-      suppressNextAudioErrorRef.current = false
-      return
-    }
-
-    playbackActiveRef.current = false
-    clearPlayTimeout()
-    revokeCurrentObjectUrl()
-    setStatus('error')
+    const audio = audioRef.current
+    const attempt = attemptRef.current
+    if (!audio || !audio.error || !attempt || !attempt.active || audio.currentSrc !== attempt.url) return
+    logAudioDiagnostic('native', undefined, audio, audioBlobRef.current?.type)
+    releaseAttempt(attempt)
+    if (mountedRef.current) setStatus('error')
   }
 
   async function playAudio(event: MouseEvent<HTMLButtonElement>) {
     event.stopPropagation()
     if (status === 'loading' || status === 'playing') return
 
+    let attempt: { generation: number; url: string; active: boolean } | null = null
     try {
       const audio = audioRef.current
       if (!audio) {
@@ -157,32 +174,44 @@ export function AudioButton({ deckId, filename, index = 1, total = 1, variant = 
         return
       }
 
-      if (playTimeoutRef.current !== null) {
-        window.clearTimeout(playTimeoutRef.current)
-        playTimeoutRef.current = null
-      }
-
+      const generation = ++generationRef.current
+      if (attemptRef.current) attemptRef.current.active = false
+      attemptRef.current = null
+      clearPlayTimeout()
       audio.pause()
       audio.currentTime = 0
-      revokeCurrentObjectUrl()
+      revokeObjectUrl(objectUrlRef.current)
       const url = URL.createObjectURL(blob)
       objectUrlRef.current = url
+      const createdAttempt = { generation, url, active: true }
+      attempt = createdAttempt
+      attemptRef.current = createdAttempt
       audio.src = url
       audio.load()
-      playbackActiveRef.current = true
       setStatus('playing')
 
       playTimeoutRef.current = window.setTimeout(() => {
-        stopAndReleaseAudio(audio)
+        if (attemptRef.current !== createdAttempt || !createdAttempt.active || generationRef.current !== generation) return
+        stopPlayback(audio)
+        createdAttempt.active = false
+        attemptRef.current = null
         playTimeoutRef.current = null
-        setStatus('idle')
+        revokeObjectUrl(url)
+        if (mountedRef.current) setStatus('idle')
       }, 120_000)
 
       await audio.play()
     } catch (error) {
-      console.warn(`Could not play audio: ${filename}`, error)
-      playbackActiveRef.current = false
-      revokeCurrentObjectUrl()
+      if (!mountedRef.current) return
+      if (attempt) {
+        if (attemptRef.current !== attempt || !attempt.active || generationRef.current !== attempt.generation) return
+        logAudioDiagnostic('play', error, audioRef.current, audioBlobRef.current?.type)
+        releaseAttempt(attempt)
+        if (mountedRef.current) setStatus('error')
+        return
+      }
+
+      logAudioDiagnostic('play-setup', error, audioRef.current, audioBlobRef.current?.type)
       setStatus('error')
     }
   }

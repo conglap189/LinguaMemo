@@ -5,6 +5,8 @@ import { ArrowRight, MoreHorizontal, Plus, Trash2, Upload } from 'lucide-react'
 
 import type { AppView } from '@/components/app/types'
 import { DeckManageModal } from '@/components/dashboard/DeckManageModal'
+import { InstallAppButton } from '@/components/install/InstallAppButton'
+import type { useInstallPrompt } from '@/src/hooks/useInstallPrompt'
 import { DeckCountPills } from '@/components/decks/deck-counts'
 import { StarterDeckSection } from '@/components/starter-decks/StarterDeckSection'
 import { createDeck, deleteDeck } from '@/src/db/deckRepo'
@@ -39,9 +41,10 @@ type DashboardPageProps = {
   onStudyDeck?: (deckId: string) => void
   initialManageDeckId?: string | null
   onManageDeckClosed?: () => void
+  install: ReturnType<typeof useInstallPrompt>
 }
 
-export function DashboardPage({ onViewChange, onStudyDeck, initialManageDeckId, onManageDeckClosed }: DashboardPageProps = {}) {
+export function DashboardPage({ onViewChange, onStudyDeck, initialManageDeckId, onManageDeckClosed, install }: DashboardPageProps) {
   const decks = useDecks()
   const deckList = decks ?? []
   const [newDeckOpen, setNewDeckOpen] = useState(false)
@@ -81,6 +84,7 @@ export function DashboardPage({ onViewChange, onStudyDeck, initialManageDeckId, 
         <h1 className="text-3xl font-extrabold tracking-tight text-forest md:text-4xl">Your Decks</h1>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:flex md:flex-wrap">
           <Button type="button" onClick={() => onViewChange?.('import')} className="rounded-2xl bg-forest text-white hover:bg-forest-dark"><Upload />Import .apkg</Button>
+          <InstallAppButton install={install} />
           <Button type="button" variant="outline" onClick={() => setNewDeckOpen(true)} className="rounded-2xl bg-white"><Plus />New Deck</Button>
         </div>
       </section>

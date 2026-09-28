@@ -12,6 +12,7 @@ import type { AppView } from '@/components/app/types'
 import { LAST_DECK_ID_STORAGE_KEY, resolveStudyDeckId } from '@/src/features/study/resolveStudyDeckId'
 import { useAppStartup } from '@/src/hooks/useAppStartup'
 import { useDecks } from '@/src/hooks/useDecks'
+import { useInstallPrompt } from '@/src/hooks/useInstallPrompt'
 import { StudyView } from '@/src/views/StudyView'
 
 export function LinguaMemoApp() {
@@ -20,6 +21,7 @@ export function LinguaMemoApp() {
   const [manageDeckId, setManageDeckId] = useState<string | null>(null)
   const decks = useDecks()
   const deckList = decks ?? []
+  const install = useInstallPrompt()
   useAppStartup()
 
   function handleViewChange(view: AppView) {
@@ -52,7 +54,7 @@ export function LinguaMemoApp() {
 
   return (
     <AppShell currentView={currentView} onViewChange={handleViewChange}>
-      {currentView === 'dashboard' && <DashboardPage onViewChange={handleViewChange} onStudyDeck={handleStudyDeck} initialManageDeckId={manageDeckId} onManageDeckClosed={() => setManageDeckId(null)} />}
+      {currentView === 'dashboard' && <DashboardPage install={install} onViewChange={handleViewChange} onStudyDeck={handleStudyDeck} initialManageDeckId={manageDeckId} onManageDeckClosed={() => setManageDeckId(null)} />}
       {currentView === 'study' && <StudyView deckId={selectedDeckId} onSelectDeck={setSelectedDeckId} onViewChange={handleViewChange} onManageDeck={handleManageDeck} />}
       {currentView === 'decks' && <DecksPage onStudyDeck={handleStudyDeck} />}
       {currentView === 'import' && <ImportPage onViewChange={handleViewChange} onStudyDeck={handleStudyDeck} />}

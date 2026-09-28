@@ -91,12 +91,12 @@ export function AppShell({ currentView = 'dashboard', onViewChange = () => {}, c
         <div className={cn(
           'h-full w-full max-w-full scrollbar-hide',
           currentView === 'study'
-            ? 'overflow-hidden p-0'
+            ? 'overflow-y-auto overflow-x-hidden p-0 pb-[calc(96px+env(safe-area-inset-bottom))] lg:overflow-hidden lg:pb-0'
             : 'overflow-y-auto px-4 pb-[calc(88px+env(safe-area-inset-bottom))] pt-4 sm:px-5 lg:p-6',
         )}>{children}</div>
       </main>
 
-      {currentView !== 'study' && <MobileBottomNav currentView={currentView} onViewChange={onViewChange} />}
+      <MobileBottomNav currentView={currentView} onViewChange={onViewChange} />
     </div>
   )
 }

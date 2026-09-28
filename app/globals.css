@@ -223,7 +223,7 @@
     padding: clamp(16px, 3vw, 32px);
   }
   .study-layout-compact {
-    height: 100dvh;
+    height: 100%;
     width: 100%;
     overflow: hidden;
   }
@@ -385,7 +385,7 @@
   }
   @media (max-width: 640px) {
     .study-layout-compact {
-      height: 100dvh;
+      height: 100%;
     }
     .study-compact-header {
       max-height: 116px;

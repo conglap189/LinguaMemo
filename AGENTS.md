@@ -154,7 +154,8 @@ Fallback behavior is important:
 
 - App shell should use `100dvh`/`h-dvh` and avoid body page scrolling.
 - Non-study pages scroll inside the app shell.
-- Bottom nav is fixed on mobile and hidden during active Study.
+- Bottom nav is fixed on mobile on every app view, including active Study and Study empty/summary states.
+- Active Study reserves the bottom-nav area, including the floating Import button and safe area, so reveal/review controls never sit underneath it.
 - Non-study pages need bottom padding for the mobile nav safe area.
 - Study card content should scroll internally when long.
 - Review buttons must remain visible at the bottom.
